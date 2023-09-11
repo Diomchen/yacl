@@ -210,6 +210,7 @@ TEST_P(BrpcLinkWithLimitTest, AsyncWithThrottleLimit) {
   auto read = [&] {
     for (size_t i = 0; i < test_size; i++) {
       const std::string key = fmt::format("Key_{}", i);
+      std::cout<<"====="<<std::endl;
       if (i == 0) {
         usleep(100 * 1000);
       }

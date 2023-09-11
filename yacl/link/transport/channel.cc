@@ -510,7 +510,8 @@ void Channel::SendAsync(const std::string& msg_key, Buffer&& value) {
 void Channel::Send(const std::string& msg_key, ByteContainerView value) {
   YACL_ENFORCE(!waiting_finish_.load(),
                "Send is not allowed when channel is closing");
-  std::cout<<"发送信息测试"<<std::endl;
+  std::cout<<"信息密钥:"<<msg_key<<std::endl;
+  std::cout<<"信息内容:"<<value.data()<<std::endl;
   NormalMessageKeyEnforce(msg_key);
   size_t seq_id = msg_seq_id_.fetch_add(1) + 1;
   auto key = BuildChannelKey(msg_key, seq_id);

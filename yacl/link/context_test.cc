@@ -82,12 +82,15 @@ TEST_F(ContextConnectToMeshTest, ConnectToMeshShouldOk) {
   for (size_t rank = 0; rank < world_size_; rank++) {
     const auto id = fmt::format("id-{}", rank);
     const auto host = fmt::format("host-{}", rank);
+    std::cout<<"id:"<<id<<",host:"<<host<<std::endl;
     ctx_desc.parties.push_back({id, host});
   }
   Context ctx(ctx_desc, self_rank_, channels_, msg_loop);
 
   // THEN
   std::string event = fmt::format("connect_{}", self_rank_);
+  std::cout<<"event:"<<event<<std::endl;
+  std::cout<<"world_size:"<<world_size_<<std::endl;
   for (size_t i = 0; i < world_size_; ++i) {
     if (i == self_rank_) {
       continue;
@@ -111,11 +114,14 @@ TEST_F(ContextConnectToMeshTest, ThrowExceptionIfNetworkError) {
   for (size_t rank = 0; rank < world_size_; rank++) {
     const auto id = fmt::format("id-{}", rank);
     const auto host = fmt::format("host-{}", rank);
+    std::cout<<"id:"<<id<<",host:"<<host<<std::endl;
     ctx_desc.parties.push_back({id, host});
   }
   Context ctx(ctx_desc, self_rank_, channels_, msg_loop);
 
   std::string event = fmt::format("connect_{}", self_rank_);
+  std::cout<<"event:"<<event<<std::endl;
+  
   EXPECT_CALL(*std::static_pointer_cast<MockChannel>(channels_[0]),
               TestSend(testing::_))
       .WillRepeatedly(ThrowNetworkErrorException());

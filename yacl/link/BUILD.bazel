@@ -31,7 +31,7 @@ yacl_cc_library(
         ":enable_tracelog": [
             "-DENABLE_LINK_TRACE",
         ],
-        "//conditions:default": [],
+            "//conditions:default": [],
     }),
     deps = [
         "//yacl/base:exception",
