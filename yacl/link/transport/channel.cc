@@ -268,6 +268,7 @@ class SendChunkedTask {
 };
 
 void Channel::SendChunked(const std::string& key, ByteContainerView value) {
+  // SPDLOG_INFO("[SendChunked] 收到 FIN 结束消息 ，消息传递已完成");
   const size_t bytes_per_chunk = link_->GetMaxBytesPerChunk();
   const size_t num_bytes = value.size();
   const size_t num_chunks = (num_bytes + bytes_per_chunk - 1) / bytes_per_chunk;
@@ -329,7 +330,6 @@ void Channel::SendTaskSynchronizer::WaitAllSendFinished() {
 
 Buffer Channel::Recv(const std::string& msg_key) {
   NormalMessageKeyEnforce(msg_key);
-
   Buffer value;
   size_t seq_id = 0;
   {
@@ -464,20 +464,25 @@ void Channel::OnMessage(const std::string& key, ByteContainerView value) {
   std::unique_lock<bthread::Mutex> lock(msg_mutex_);
   if (key == kAckKey) {
     size_t seq_id = ViewToSizeT(value);
+    SPDLOG_INFO("[OnMessage] 收到 ACK 确认消息，当前 seq_id:{}", seq_id);
     if (received_ack_ids_.Insert(seq_id)) {
       ack_fin_cond_.notify_all();
     } else {
       SPDLOG_WARN("Duplicate ACK id {}", seq_id);
     }
   } else if (key == kFinKey) {
+    SPDLOG_INFO("[OnMessage] 收到 FIN 结束消息 ，消息传递已完成");
     if (!received_fin_) {
       received_fin_ = true;
       peer_sent_msg_count_ = ViewToSizeT(value);
+      SPDLOG_INFO("[OnMessage] 对方发送消息数为:{}", peer_sent_msg_count_);
       ack_fin_cond_.notify_all();
     } else {
       SPDLOG_WARN("Duplicate FIN");
     }
   } else {
+    SPDLOG_INFO("[OnMessage] 收到普通消息, key:{}", key);
+    SPDLOG_INFO("[OnMessage] 收到普通消息, value:{}", static_cast<std::string_view>(value));
     OnNormalMessage(key, value);
   }
 }
@@ -494,6 +499,9 @@ void Channel::SendAsync(const std::string& msg_key, ByteContainerView value) {
 
 void Channel::MessageQueue::Push(Message&& msg) {
   std::unique_lock<bthread::Mutex> lock(mutex_);
+  SPDLOG_INFO("[Push] 信息进入消息队列：seq_id:{}", msg.seq_id_);
+  SPDLOG_INFO("[Push] 信息进入消息队列：msg_key:{}", msg.msg_key_);
+  SPDLOG_INFO("[Push] 信息进入消息队列：byteContainerView:{}", static_cast<std::string_view>(msg.value_));
   queue_.push(std::move(msg));
   cond_.notify_all();
 }
@@ -501,20 +509,27 @@ void Channel::MessageQueue::Push(Message&& msg) {
 void Channel::SendAsync(const std::string& msg_key, Buffer&& value) {
   YACL_ENFORCE(!waiting_finish_.load(),
                "SendAsync is not allowed when channel is closing");
+
   NormalMessageKeyEnforce(msg_key);
   size_t seq_id = msg_seq_id_.fetch_add(1) + 1;
   auto key = BuildChannelKey(msg_key, seq_id);
+  SPDLOG_INFO("[SendAsync] 异步发送消息 seq_id: {}", seq_id);
+  SPDLOG_INFO("[SendAsync] 异步发送消息密钥 msg_key: {}", msg_key);
+  SPDLOG_INFO("[SendAsync] 异步发送密钥 key: {}", key);
+  SPDLOG_INFO("[SendAsync] 异步发送消息内容 value: {}", static_cast<std::string_view>(value));
   msg_queue_.Push(Message(seq_id, std::move(key), std::move(value)));
 }
 
 void Channel::Send(const std::string& msg_key, ByteContainerView value) {
   YACL_ENFORCE(!waiting_finish_.load(),
                "Send is not allowed when channel is closing");
-  std::cout<<"信息密钥:"<<msg_key<<std::endl;
-  std::cout<<"信息内容:"<<value.data()<<std::endl;
   NormalMessageKeyEnforce(msg_key);
   size_t seq_id = msg_seq_id_.fetch_add(1) + 1;
   auto key = BuildChannelKey(msg_key, seq_id);
+  SPDLOG_INFO("[Send] 发送消息 seq_id: {}", seq_id);
+  SPDLOG_INFO("[Send] 发送消息密钥 msg_key: {}", msg_key);
+  SPDLOG_INFO("[Send] 发送密钥 key: {}", key);
+  SPDLOG_INFO("[Send] 发送消息内容 value: {}", static_cast<std::string_view>(value));
   msg_queue_.Push(Message(seq_id, std::move(key), value));
   send_sync_.WaitSeqIdSendFinished(seq_id);
 }
@@ -530,6 +545,10 @@ void Channel::SendAsyncThrottled(const std::string& msg_key, Buffer&& value) {
   NormalMessageKeyEnforce(msg_key);
   size_t seq_id = msg_seq_id_.fetch_add(1) + 1;
   auto key = BuildChannelKey(msg_key, seq_id);
+  SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送消息 seq_id: {}", seq_id);
+  SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送消息密钥 msg_key: {}", msg_key);
+  SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送密钥 key: {}", key);
+  SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送消息内容：{}", static_cast<std::string_view>(value));
   msg_queue_.Push(Message(seq_id, std::move(key), std::move(value)));
   ThrottleWindowWait(seq_id);
 }
@@ -645,20 +664,26 @@ void Channel::OnRequest(const ::google::protobuf::Message& request,
                         ::google::protobuf::Message* response) {
   YACL_ENFORCE(response != nullptr, "response should not be null");
   YACL_ENFORCE(link_ != nullptr, "delegate should not be null");
+  
+  SPDLOG_INFO("[OnRequest] 处理 Request");
 
   link_->FillResponseOk(request, response);
 
   if (link_->IsMonoRequest(request)) {
+    SPDLOG_INFO("[OnRequest] 该 Request 为 MonoRequest");
     std::string key;
     ByteContainerView value;
     link_->UnpackMonoRequest(request, &key, &value);
+    SPDLOG_INFO("{} recv {}", link_->LocalRank(), key);
     SPDLOG_DEBUG("{} recv {}", link_->LocalRank(), key);
     OnMessage(key, value);
   } else if (link_->IsChunkedRequest(request)) {
+    SPDLOG_INFO("[OnRequest] 该 Request 为 ChunkedRequest");
     std::string key;
     ByteContainerView value;
     size_t offset = 0;
     size_t total_length = 0;
+    SPDLOG_INFO("{} recv {}", link_->LocalRank(), key);
     SPDLOG_DEBUG("{} recv {}", link_->LocalRank(), key);
     link_->UnpackChunckRequest(request, &key, &value, &offset, &total_length);
     OnChunkedMessage(key, value, offset, total_length);
