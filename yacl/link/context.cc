@@ -230,7 +230,6 @@ void Context::Send(size_t dst_rank, ByteContainerView value,
   const auto event = NextP2PId(rank_, dst_rank);
 
   TraceLogger::LinkTrace(event, tag, value);
-  std::cout<<"测试：Send[233]"<<std::endl;
 
   SendInternal(dst_rank, event, value);
 }

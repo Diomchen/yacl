@@ -69,6 +69,9 @@ class ByteContainerView : public absl::Span<const uint8_t> {
                    : std::string_view(reinterpret_cast<const char *>(data()),
                                       size());
   }
+
+  // // 增加转16进制字符串
+  // std::string BytesToHexString
 };
 
 }  // namespace yacl

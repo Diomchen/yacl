@@ -20,9 +20,10 @@
 #include "absl/strings/numbers.h"
 #include "spdlog/spdlog.h"
 
-#include "yacl/base/buffer.h"
+#include "yacl/base/buffer.h" 
 #include "yacl/base/byte_container_view.h"
 #include "yacl/base/exception.h"
+#include "absl/strings/escaping.h"
 
 namespace yacl::link::transport {
 
@@ -482,7 +483,17 @@ void Channel::OnMessage(const std::string& key, ByteContainerView value) {
     }
   } else {
     SPDLOG_INFO("[OnMessage] 收到普通消息, key:{}", key);
-    SPDLOG_INFO("[OnMessage] 收到普通消息, value:{}", static_cast<std::string_view>(value));
+    if(value.size()>16){
+    absl::string_view original_str_view = static_cast<absl::string_view>(Buffer(value));
+    auto len = original_str_view.size();
+    auto display_str_view_pre = original_str_view.substr(0, 8);
+    auto display_str_view_suf = original_str_view.substr(len-8, len);
+    SPDLOG_INFO("[OnMessage] 收到普通消息 value: {}", absl::BytesToHexString(display_str_view_pre)+"..."+absl::BytesToHexString(display_str_view_suf));
+  }
+  else{
+    SPDLOG_INFO("[OnMessage] 收到普通消息 value: {}", absl::BytesToHexString(static_cast<absl::string_view>(value)));
+  }
+    // SPDLOG_INFO("[OnMessage] 收到普通消息, value:{}", absl::BytesToHexString(static_cast<absl::string_view>(Buffer(value))));
     OnNormalMessage(key, value);
   }
 }
@@ -501,7 +512,17 @@ void Channel::MessageQueue::Push(Message&& msg) {
   std::unique_lock<bthread::Mutex> lock(mutex_);
   SPDLOG_INFO("[Push] 信息进入消息队列：seq_id:{}", msg.seq_id_);
   SPDLOG_INFO("[Push] 信息进入消息队列：msg_key:{}", msg.msg_key_);
-  SPDLOG_INFO("[Push] 信息进入消息队列：byteContainerView:{}", static_cast<std::string_view>(msg.value_));
+  if(msg.value_.size()>16){
+    absl::string_view original_str_view = static_cast<absl::string_view>(msg.value_);
+    auto len = original_str_view.size();
+    auto display_str_view_pre = original_str_view.substr(0, 8);
+    auto display_str_view_suf = original_str_view.substr(len-8, len);
+    SPDLOG_INFO("[Push] 信息进入消息队列 value: {}", absl::BytesToHexString(display_str_view_pre)+"..."+absl::BytesToHexString(display_str_view_suf));
+  }
+  else{
+    SPDLOG_INFO("[Push] 信息进入消息队列 value: {}", absl::BytesToHexString(static_cast<absl::string_view>(msg.value_)));
+  }
+  // SPDLOG_INFO("[Push] 信息进入消息队列：byteContainerView:{}", absl::BytesToHexString((std::string_view)msg.value_));
   queue_.push(std::move(msg));
   cond_.notify_all();
 }
@@ -516,7 +537,16 @@ void Channel::SendAsync(const std::string& msg_key, Buffer&& value) {
   SPDLOG_INFO("[SendAsync] 异步发送消息 seq_id: {}", seq_id);
   SPDLOG_INFO("[SendAsync] 异步发送消息密钥 msg_key: {}", msg_key);
   SPDLOG_INFO("[SendAsync] 异步发送密钥 key: {}", key);
-  SPDLOG_INFO("[SendAsync] 异步发送消息内容 value: {}", static_cast<std::string_view>(value));
+  if(value.size()>16){
+    absl::string_view original_str_view = static_cast<absl::string_view>(value);
+    auto len = original_str_view.size();
+    auto display_str_view_pre = original_str_view.substr(0, 8);
+    auto display_str_view_suf = original_str_view.substr(len-8, len);
+    SPDLOG_INFO("[SendAsync] 异步发送消息内容 value: {}", absl::BytesToHexString(display_str_view_pre)+"..."+absl::BytesToHexString(display_str_view_suf));
+  }
+  else{
+    SPDLOG_INFO("[SendAsync] 异步发送消息内容 value: {}", absl::BytesToHexString(static_cast<absl::string_view>(value)));
+  }
   msg_queue_.Push(Message(seq_id, std::move(key), std::move(value)));
 }
 
@@ -529,7 +559,18 @@ void Channel::Send(const std::string& msg_key, ByteContainerView value) {
   SPDLOG_INFO("[Send] 发送消息 seq_id: {}", seq_id);
   SPDLOG_INFO("[Send] 发送消息密钥 msg_key: {}", msg_key);
   SPDLOG_INFO("[Send] 发送密钥 key: {}", key);
-  SPDLOG_INFO("[Send] 发送消息内容 value: {}", static_cast<std::string_view>(value));
+  
+  if(value.size()>16){
+    absl::string_view original_str_view = static_cast<absl::string_view>(Buffer(value));
+    auto len = original_str_view.size();
+    auto display_str_view_pre = original_str_view.substr(0, 8);
+    auto display_str_view_suf = original_str_view.substr(len-8, len);
+    SPDLOG_INFO("[Send] 发送消息内容 value: {}", absl::BytesToHexString(display_str_view_pre)+"..."+absl::BytesToHexString(display_str_view_suf));
+  }
+  else{
+    SPDLOG_INFO("[Send] 发送消息内容 value: {}", absl::BytesToHexString(static_cast<absl::string_view>(Buffer(value))));
+  }
+
   msg_queue_.Push(Message(seq_id, std::move(key), value));
   send_sync_.WaitSeqIdSendFinished(seq_id);
 }
@@ -548,7 +589,17 @@ void Channel::SendAsyncThrottled(const std::string& msg_key, Buffer&& value) {
   SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送消息 seq_id: {}", seq_id);
   SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送消息密钥 msg_key: {}", msg_key);
   SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送密钥 key: {}", key);
-  SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送消息内容：{}", static_cast<std::string_view>(value));
+  if(value.size()>16){
+    absl::string_view original_str_view = static_cast<absl::string_view>(value);
+    auto len = original_str_view.size();
+    auto display_str_view_pre = original_str_view.substr(0, 8);
+    auto display_str_view_suf = original_str_view.substr(len-8, len);
+    SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送消息内容 value: {}", absl::BytesToHexString(display_str_view_pre)+"..."+absl::BytesToHexString(display_str_view_suf));
+  }
+  else{
+    SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送消息内容 value: {}", absl::BytesToHexString(static_cast<absl::string_view>(value)));
+  }
+  // SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送消息内容：{}", absl::BytesToHexString(static_cast<absl::string_view>(value)));
   msg_queue_.Push(Message(seq_id, std::move(key), std::move(value)));
   ThrottleWindowWait(seq_id);
 }
