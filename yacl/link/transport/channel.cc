@@ -493,7 +493,6 @@ void Channel::OnMessage(const std::string& key, ByteContainerView value) {
   else{
     SPDLOG_INFO("[OnMessage] 收到普通消息 value: {}", absl::BytesToHexString(static_cast<absl::string_view>(value)));
   }
-    // SPDLOG_INFO("[OnMessage] 收到普通消息, value:{}", absl::BytesToHexString(static_cast<absl::string_view>(Buffer(value))));
     OnNormalMessage(key, value);
   }
 }
@@ -522,7 +521,6 @@ void Channel::MessageQueue::Push(Message&& msg) {
   else{
     SPDLOG_INFO("[Push] 信息进入消息队列 value: {}", absl::BytesToHexString(static_cast<absl::string_view>(msg.value_)));
   }
-  // SPDLOG_INFO("[Push] 信息进入消息队列：byteContainerView:{}", absl::BytesToHexString((std::string_view)msg.value_));
   queue_.push(std::move(msg));
   cond_.notify_all();
 }
@@ -599,7 +597,6 @@ void Channel::SendAsyncThrottled(const std::string& msg_key, Buffer&& value) {
   else{
     SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送消息内容 value: {}", absl::BytesToHexString(static_cast<absl::string_view>(value)));
   }
-  // SPDLOG_INFO("[SendAsyncThrottled] 限制型异步发送消息内容：{}", absl::BytesToHexString(static_cast<absl::string_view>(value)));
   msg_queue_.Push(Message(seq_id, std::move(key), std::move(value)));
   ThrottleWindowWait(seq_id);
 }
